@@ -57,7 +57,8 @@ class BaseConversationMemory(SerializableMixin, ABC):
 
     def load_runs(self) -> list[Run]:
         runs, meta = self.conversation_memory_driver.load()
-        self.runs.extend(runs)
+        if runs:
+            self.runs = list(runs)
         self.meta = dict_merge(self.meta, meta)
 
         return self.runs

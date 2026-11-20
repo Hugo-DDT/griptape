@@ -2,6 +2,7 @@ import json
 
 from griptape.artifacts import TextArtifact
 from griptape.common import PromptStack
+from griptape.drivers.memory.conversation.local import LocalConversationMemoryDriver
 from griptape.memory.structure import BaseConversationMemory, ConversationMemory, Run
 from griptape.structures import Agent, Pipeline
 from griptape.tasks import PromptTask
@@ -177,3 +178,41 @@ class TestConversationMemory:
         assert prompt_stack.messages[2].content[0].artifact.value == "bar2"
         assert prompt_stack.messages[-2].content[0].artifact.value == "foo"
         assert prompt_stack.messages[-1].content[0].artifact.value == "bar"
+
+    def test_autoload_replaces_runs_with_driver_runs(self, tmp_path):
+        persist_file = tmp_path / "memory.json"
+        driver = LocalConversationMemoryDriver(persist_file=str(persist_file))
+        writer = ConversationMemory(conversation_memory_driver=driver)
+        for index in (1, 2):
+            writer.add_run(Run(input=TextArtifact(f"q{index}"), output=TextArtifact(f"a{index}")))
+
+        memory = ConversationMemory(
+            conversation_memory_driver=driver,
+            runs=[Run(input=TextArtifact("q1"), output=TextArtifact("a1"))],
+        )
+
+        assert [run.input.value for run in memory.runs] == ["q1", "q2"]
+
+    def test_load_runs_preserves_runs_when_driver_has_none(self):
+        memory = ConversationMemory(
+            conversation_memory_driver=LocalConversationMemoryDriver(),
+            runs=[Run(input=TextArtifact("q1"), output=TextArtifact("a1"))],
+        )
+
+        assert [run.input.value for run in memory.runs] == ["q1"]
+        assert memory.runs[0].output.value == "a1"
+
+    def test_load_runs_does_not_duplicate_when_called_again(self, tmp_path):
+        persist_file = tmp_path / "memory.json"
+        driver = LocalConversationMemoryDriver(persist_file=str(persist_file))
+        writer = ConversationMemory(conversation_memory_driver=driver)
+        for index in (1, 2):
+            writer.add_run(Run(input=TextArtifact(f"q{index}"), output=TextArtifact(f"a{index}")))
+
+        memory = ConversationMemory(conversation_memory_driver=driver)
+
+        assert [run.input.value for run in memory.runs] == ["q1", "q2"]
+
+        memory.load_runs()
+
+        assert [run.input.value for run in memory.runs] == ["q1", "q2"]
