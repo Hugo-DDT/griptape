@@ -11,4 +11,7 @@ from griptape.loaders import BaseFileLoader
 @define
 class JsonLoader(BaseFileLoader[JsonArtifact]):
     def parse(self, data: bytes) -> JsonArtifact:
-        return JsonArtifact(json.loads(data), encoding=self.encoding)
+        # JsonArtifact treats a str as JSON text and decodes it again. The file
+        # bytes are already parsed here, so hand the value back as JSON text.
+        parsed = json.loads(data.decode(self.encoding))
+        return JsonArtifact(json.dumps(parsed), encoding=self.encoding)
